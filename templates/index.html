@@ -3,111 +3,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador de CV</title>
+    <title>Generador de CV con Previsualización</title>
     <style>
-        body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
-        .container { max-width: 680px; background: white; padding: 30px; margin: auto; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-        h2 { color: #1a365d; margin-top: 0; font-size: 24px; }
-        .group { margin-bottom: 16px; }
-        label { display: block; font-weight: 600; margin-bottom: 6px; color: #2d3748; font-size: 14px; }
-        input, textarea, select { width: 100%; padding: 9px; box-sizing: border-box; border: 1px solid #cbd5e0; border-radius: 6px; font-family: inherit; font-size: 14px; }
-        input[type="file"] { padding: 5px; background: #fafafa; }
-        textarea { height: 75px; resize: vertical; }
-        .optional { font-weight: normal; font-size: 0.85em; color: #718096; }
-        button { background: #2b6cb0; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; margin-top: 10px; }
-        button:hover { background: #2c5282; }
+        * { box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5; margin: 0; padding: 0; }
+        .wrapper { display: flex; height: 100vh; overflow: hidden; }
+        
+        .form-panel { width: 50%; padding: 25px; overflow-y: auto; background: white; border-right: 1px solid #e2e8f0; }
+        h2 { color: #1a365d; margin-top: 0; }
+        .group { margin-bottom: 14px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; color: #2d3748; font-size: 13px; }
+        input, textarea, select { width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-family: inherit; font-size: 13px; }
+        textarea { height: 60px; resize: vertical; }
+        .optional { font-weight: normal; color: #718096; }
+        
+        .dynamic-item { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-bottom: 8px; position: relative; }
+        .btn-remove { position: absolute; right: 8px; top: 8px; background: #e53e3e; color: white; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+        .btn-add { background: #edf2f7; color: #2b6cb0; border: 1px dashed #2b6cb0; width: 100%; padding: 8px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-bottom: 15px; font-size: 13px; }
+        
+        .actions { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-submit { background: #2b6cb0; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: bold; flex: 1; }
+        .btn-demo { background: #38a169; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; }
+        
+        .preview-panel { width: 50%; background: #2d3748; display: flex; flex-direction: column; }
+        .preview-header { color: white; padding: 10px 20px; font-size: 13px; background: #1a202c; display: flex; justify-content: space-between; align-items: center; }
+        iframe { width: 100%; height: 100%; border: none; background: white; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>Generador de Curriculum Vitae</h2>
-    <!-- Importante: enctype para subida de archivos -->
-    <form action="/generate" method="POST" enctype="multipart/form-data">
-        
-        <div class="group">
-            <label>Estilo / Paleta de Colores</label>
-            <select name="theme">
-                <option value="blue">Azul Ejecutivo</option>
-                <option value="dark">Gris Oscuro / Elegante</option>
-                <option value="green">Verde Moderno</option>
-                <option value="grey">Minimalista Monocromo</option>
-            </select>
-        </div>
+<div class="wrapper">
+    <div class="form-panel">
+        <h2>Generador de CV</h2>
+        <form id="cvForm" action="/generate" method="POST">
+            
+            <div class="group">
+                <label>Estilo / Paleta de Colores</label>
+                <select name="theme">
+                    <option value="blue">Azul Ejecutivo</option>
+                    <option value="dark">Gris Oscuro / Elegante</option>
+                    <option value="green">Verde Moderno</option>
+                    <option value="grey">Minimalista Monocromo</option>
+                </select>
+            </div>
 
-        <div class="group">
-            <label>Foto de Perfil <span class="optional">(Opcional, JPG/PNG)</span></label>
-            <input type="file" name="photo" accept="image/*">
-        </div>
+            <div class="group">
+                <label>Foto de Perfil <span class="optional">(Opcional)</span></label>
+                <input type="file" id="photoInput" accept="image/*" onchange="convertPhotoToBase64()">
+                <input type="hidden" name="photo_b64" id="photoB64">
+            </div>
 
-        <div class="group">
-            <label>Nombre Completo *</label>
-            <input type="text" name="fullName" required placeholder="Ej: Gonzalo Pérez">
-        </div>
+            <div class="group">
+                <label>Nombre Completo *</label>
+                <input type="text" name="fullName" required placeholder="Ej: Gonzalo Pérez">
+            </div>
 
-        <div class="group">
-            <label>Email *</label>
-            <input type="email" name="email" required placeholder="ejemplo@correo.com">
-        </div>
+            <div class="group">
+                <label>Email *</label>
+                <input type="email" name="email" required placeholder="ejemplo@correo.com">
+            </div>
 
-        <div class="group">
-            <label>Teléfono</label>
-            <input type="text" name="phone" placeholder="+54 223 1234567">
-        </div>
+            <div class="group">
+                <label>Teléfono / Ubicación</label>
+                <input type="text" name="phone" placeholder="+54 223 1234567" style="margin-bottom: 5px;">
+                <input type="text" name="location" placeholder="Mar del Plata, Argentina">
+            </div>
 
-        <div class="group">
-            <label>Ubicación</label>
-            <input type="text" name="location" placeholder="Mar del Plata, Argentina">
-        </div>
+            <div class="group">
+                <label>LinkedIn / GitHub <span class="optional">(Opcional)</span></label>
+                <input type="text" name="linkedin" placeholder="linkedin.com/in/usuario" style="margin-bottom: 5px;">
+                <input type="text" name="github" placeholder="github.com/usuario">
+            </div>
 
-        <div class="group">
-            <label>LinkedIn / Sitio Web <span class="optional">(Opcional)</span></label>
-            <input type="text" name="linkedin" placeholder="linkedin.com/in/usuario">
-        </div>
+            <div class="group">
+                <label>Perfil Profesional <span class="optional">(Opcional)</span></label>
+                <textarea name="summary" placeholder="Estudiante de Análisis de Sistemas orientado al desarrollo backend con Python..."></textarea>
+            </div>
 
-        <div class="group">
-            <label>GitHub / Porfolio <span class="optional">(Opcional)</span></label>
-            <input type="text" name="github" placeholder="github.com/usuario">
-        </div>
-
-        <div class="group">
-            <label>Perfil Profesional / Sobre Mí <span class="optional">(Opcional)</span></label>
-            <textarea name="summary" placeholder="Estudiante de Análisis de Sistemas apasionado por el desarrollo en Python..."></textarea>
-        </div>
-
-        <div class="group">
-            <label>Educación *</label>
-            <textarea name="education" required placeholder="Analista de Sistemas - Instituto X (2024 - Presente)"></textarea>
-        </div>
-
-        <div class="group">
             <label>Experiencia Laboral <span class="optional">(Opcional)</span></label>
-            <textarea name="experience" placeholder="Empresa Y - Desarrollador Trainee (2025 - Presente)&#10;- Mantenimiento de APIs en Flask"></textarea>
-        </div>
+            <div id="experienceContainer"></div>
+            <button type="button" class="btn-add" onclick="addExperience()">+ Agregar Experiencia</button>
+            <textarea name="experience" id="hiddenExperience" style="display:none;"></textarea>
 
-        <div class="group">
-            <label>Proyectos Destacados <span class="optional">(Opcional)</span></label>
-            <textarea name="projects" placeholder="Sistema de Gestión Web - App Flask conectada a base de datos PostgreSQL&#10;Generador de CV - Herramienta en Python para exportación de PDF"></textarea>
-        </div>
+            <div class="group">
+                <label>Educación *</label>
+                <textarea name="education" required placeholder="Analista de Sistemas - Instituto X (2024 - Presente)"></textarea>
+            </div>
 
-        <div class="group">
-            <label>Cursos y Certificaciones <span class="optional">(Opcional)</span></label>
-            <textarea name="courses" placeholder="Curso de Python & Flask - 50hs&#10;Bases de Datos SQL - 30hs"></textarea>
-        </div>
+            <div class="group">
+                <label>Proyectos Destacados <span class="optional">(Opcional)</span></label>
+                <textarea name="projects" placeholder="Sistema Web de Gestión - Flask / PostgreSQL"></textarea>
+            </div>
 
-        <div class="group">
-            <label>Habilidades y Tecnologías <span class="optional">(Opcional)</span></label>
-            <textarea name="skills" placeholder="Lenguajes: Python, SQL, HTML/CSS&#10;Herramientas: Git, Flask, ReportLab"></textarea>
-        </div>
+            <div class="group">
+                <label>Cursos y Certificaciones <span class="optional">(Opcional)</span></label>
+                <textarea name="courses" placeholder="Python Avanzado - 40hs"></textarea>
+            </div>
 
-        <div class="group">
-            <label>Idiomas <span class="optional">(Opcional)</span></label>
-            <textarea name="languages" placeholder="Español: Nativo&#10;Inglés: B2 / Intermedio Avanzado"></textarea>
-        </div>
+            <div class="group">
+                <label>Habilidades e Idiomas <span class="optional">(Opcional)</span></label>
+                <textarea name="skills" placeholder="Python, Flask, Git, SQL" style="margin-bottom: 5px;"></textarea>
+                <textarea name="languages" placeholder="Español: Nativo | Inglés: B2"></textarea>
+            </div>
 
-        <button type="submit">Generar PDF</button>
-    </form>
+            <div class="actions">
+                <button type="button" class="btn-demo" onclick="fillDemoData()">Cargar Ejemplo</button>
+                <button type="submit" class="btn-submit">Descargar PDF</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="preview-panel">
+        <div class="preview-header">
+            <span>Previsualización en tiempo real</span>
+            <span id="statusIndicator">Actualizado</span>
+        </div>
+        <iframe id="pdfPreview"></iframe>
+    </div>
 </div>
+
+<script>
+    function convertPhotoToBase64() {
+        const fileInput = document.getElementById('photoInput');
+        const hiddenInput = document.getElementById('photoB64');
+        
+        if (fileInput.files && fileInput.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                hiddenInput.value = e.target.result;
+                updatePreview();
+            };
+            reader.readAsDataURL(fileInput.files[0]);
+        } else {
+            hiddenInput.value = '';
+            updatePreview();
+        }
+    }
+
+    function addExperience(company = '', role = '', desc = '') {
+        const container = document.getElementById('experienceContainer');
+        const div = document.createElement('div');
+        div.className = 'dynamic-item';
+        div.innerHTML = `
+            <button type="button" class="btn-remove" onclick="this.parentElement.remove(); syncExperience(); updatePreview();">✕</button>
+            <input type="text" placeholder="Empresa" class="exp-company" value="${company}" style="margin-bottom:4px;" oninput="syncExperience(); updatePreview();">
+            <input type="text" placeholder="Puesto / Fechas" class="exp-role" value="${role}" style="margin-bottom:4px;" oninput="syncExperience(); updatePreview();">
+            <textarea placeholder="Tareas / Logros" class="exp-desc" oninput="syncExperience(); updatePreview();">${desc}</textarea>
+        `;
+        container.appendChild(div);
+        syncExperience();
+    }
+
+    function syncExperience() {
+        const items = document.querySelectorAll('.dynamic-item');
+        let formatted = [];
+        items.forEach(item => {
+            const comp = item.querySelector('.exp-company').value;
+            const role = item.querySelector('.exp-role').value;
+            const desc = item.querySelector('.exp-desc').value;
+            if (comp || role || desc) {
+                formatted.push(`${comp} - ${role}\n${desc}`);
+            }
+        });
+        document.getElementById('hiddenExperience').value = formatted.join('\n\n');
+    }
+
+    let timeoutId;
+    function updatePreview() {
+        document.getElementById('statusIndicator').innerText = "Generando...";
+        clearTimeout(timeoutId);
+        
+        timeoutId = setTimeout(() => {
+            syncExperience();
+            const form = document.getElementById('cvForm');
+            const formData = new FormData(form);
+
+            fetch('/preview', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.blob())
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                document.getElementById('pdfPreview').src = url;
+                document.getElementById('statusIndicator').innerText = "Actualizado";
+            })
+            .catch(() => {
+                document.getElementById('statusIndicator').innerText = "Error";
+            });
+        }, 800);
+    }
+
+    document.getElementById('cvForm').addEventListener('input', updatePreview);
+    document.getElementById('cvForm').addEventListener('change', updatePreview);
+
+    function fillDemoData() {
+        const form = document.getElementById('cvForm');
+        form.fullName.value = "Gonzalo Pérez";
+        form.email.value = "gonzalo@ejemplo.com";
+        form.phone.value = "+54 223 555-0199";
+        form.location.value = "Mar del Plata, Argentina";
+        form.linkedin.value = "linkedin.com/in/gonzalo";
+        form.github.value = "github.com/gonzalo";
+        form.summary.value = "Estudiante de Análisis de Sistemas apasionado por el desarrollo de aplicaciones web y automatización con Python.";
+        form.education.value = "Análisis de Sistemas - Instituto Técnico (2024 - Presente)";
+        form.projects.value = "Generador de CV - App web en Flask con previsualización en tiempo real e integración con ReportLab.";
+        form.courses.value = "Desarrollo Backend con Python - 60hs";
+        form.skills.value = "Python, Flask, Git, PostgreSQL, HTML/CSS, JavaScript";
+        form.languages.value = "Español: Nativo\nInglés: B2 / Intermedio Avanzado";
+
+        document.getElementById('experienceContainer').innerHTML = '';
+        addExperience("Tech Solutions", "Desarrollador Trainee (2025 - Presente)", "Mantenimiento de endpoints en Flask y optimización de consultas SQL.");
+        
+        updatePreview();
+    }
+
+    window.onload = updatePreview;
+</script>
 
 </body>
 </html>

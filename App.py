@@ -1,8 +1,10 @@
 import io
+import base64
+from PIL import Image as PILImage
 from flask import Flask, render_template, request, send_file
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, HRFlowable, Table, TableStyle, Image
+from reportlab.platypus import SimpleDocTemplate, Paragraph, HRFlowable, Table, TableStyle, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 
@@ -15,7 +17,7 @@ COLOR_THEMES = {
     'grey': {'primary': '#2D3748', 'secondary': '#718096', 'text': '#4A5568', 'line': '#E2E8F0'}
 }
 
-def build_pdf(data, photo_file=None):
+def build_pdf(data, photo_base64=None):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40
@@ -46,7 +48,7 @@ def build_pdf(data, photo_file=None):
 
     story = []
 
-    # --- Bloque Encabezado (Texto + Foto opcional) ---
+    # Encabezado (Texto)
     header_text_elements = [
         Paragraph(data.get('fullName', 'Sin Nombre'), title_style)
     ]
@@ -59,94 +61,100 @@ def build_pdf(data, photo_file=None):
     if contact_info:
         header_text_elements.append(Paragraph(" • ".join(contact_info), subtitle_style))
 
-    # Si hay foto, creamos una tabla de 2 columnas para el encabezado
-    if photo_file and photo_file.filename != '':
+    # Procesar foto con Pillow -> BytesIO
+    img_element = None
+    if photo_base64 and len(photo_base64.strip()) > 0:
         try:
-            photo_bytes = io.BytesIO(photo_file.read())
-            img = Image(photo_bytes, width=1.1*inch, height=1.3*inch)
+            if ',' in photo_base64:
+                photo_base64 = photo_base64.split(',')[1]
             
-            # Tabla: [Texto de Encabezado, Foto]
-            header_table = Table([[header_text_elements, img]], colWidths=[420, 100])
-            header_table.setStyle(TableStyle([
-                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-                ('ALIGN', (1,0), (1,0), 'RIGHT'),
-            ]))
-            story.append(header_table)
-        except Exception:
-            # Si falla la lectura de la imagen, genera el encabezado sin foto
-            story.extend(header_text_elements)
+            raw_bytes = base64.b64decode(photo_base64)
+            pil_img = PILImage.open(io.BytesIO(raw_bytes))
+            
+            # Convertir a RGB si la imagen viene en RGBA o P
+            if pil_img.mode in ('RGBA', 'P'):
+                pil_img = pil_img.convert('RGB')
+                
+            img_io = io.BytesIO()
+            pil_img.save(img_io, format='JPEG')
+            img_io.seek(0)
+            
+            img_element = RLImage(img_io, width=1.1*inch, height=1.3*inch)
+        except Exception as e:
+            print(f"Error procesando imagen: {e}")
+            img_element = None
+
+    if img_element:
+        # Tabla para ubicar texto a la izquierda (432pt) y foto a la derecha (100pt)
+        header_table = Table([[header_text_elements, img_element]], colWidths=[432, 100])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('ALIGN', (1,0), (1,0), 'RIGHT'),
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+            ('RIGHTPADDING', (0,0), (-1,-1), 0),
+            ('TOPPADDING', (0,0), (-1,-1), 0),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ]))
+        story.append(header_table)
     else:
         story.extend(header_text_elements)
     
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor(theme['line']), spaceBefore=8, spaceAfter=10))
 
-    # Perfil / Resumen Profesional
-    if data.get('summary'):
-        story.append(Paragraph("Perfil Profesional", section_style))
-        story.append(Paragraph(data['summary'].replace('\n', '<br/>'), body_style))
+    sections = [
+        ('Perfil Profesional', 'summary'),
+        ('Educación', 'education'),
+        ('Experiencia Laboral', 'experience'),
+        ('Proyectos Destacados', 'projects'),
+        ('Cursos y Certificaciones', 'courses'),
+        ('Habilidades y Tecnologías', 'skills'),
+        ('Idiomas', 'languages')
+    ]
 
-    # Educación
-    if data.get('education'):
-        story.append(Paragraph("Educación", section_style))
-        story.append(Paragraph(data['education'].replace('\n', '<br/>'), body_style))
-
-    # Experiencia Laboral
-    if data.get('experience'):
-        story.append(Paragraph("Experiencia Laboral", section_style))
-        story.append(Paragraph(data['experience'].replace('\n', '<br/>'), body_style))
-
-    # Proyectos Destacados
-    if data.get('projects'):
-        story.append(Paragraph("Proyectos Destacados", section_style))
-        story.append(Paragraph(data['projects'].replace('\n', '<br/>'), body_style))
-
-    # Cursos y Certificaciones
-    if data.get('courses'):
-        story.append(Paragraph("Cursos y Certificaciones", section_style))
-        story.append(Paragraph(data['courses'].replace('\n', '<br/>'), body_style))
-
-    # Habilidades y Tecnologías
-    if data.get('skills'):
-        story.append(Paragraph("Habilidades y Tecnologías", section_style))
-        story.append(Paragraph(data['skills'].replace('\n', '<br/>'), body_style))
-
-    # Idiomas
-    if data.get('languages'):
-        story.append(Paragraph("Idiomas", section_style))
-        story.append(Paragraph(data['languages'].replace('\n', '<br/>'), body_style))
+    for title, key in sections:
+        if data.get(key):
+            story.append(Paragraph(title, section_style))
+            story.append(Paragraph(data[key].replace('\n', '<br/>'), body_style))
 
     doc.build(story)
     buffer.seek(0)
     return buffer
 
+def extract_form_data(req):
+    return {
+        'theme': req.form.get('theme', 'blue'),
+        'fullName': req.form.get('fullName'),
+        'email': req.form.get('email'),
+        'phone': req.form.get('phone'),
+        'location': req.form.get('location'),
+        'linkedin': req.form.get('linkedin'),
+        'github': req.form.get('github'),
+        'summary': req.form.get('summary'),
+        'education': req.form.get('education'),
+        'experience': req.form.get('experience'),
+        'projects': req.form.get('projects'),
+        'courses': req.form.get('courses'),
+        'skills': req.form.get('skills'),
+        'languages': req.form.get('languages')
+    }
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
+@app.route('/preview', methods=['POST'])
+def preview():
+    data = extract_form_data(request)
+    photo_b64 = request.form.get('photo_b64')
+    pdf_buffer = build_pdf(data, photo_b64)
+    return send_file(pdf_buffer, mimetype='application/pdf')
+
 @app.route('/generate', methods=['POST'])
 def generate():
-    data = {
-        'theme': request.form.get('theme', 'blue'),
-        'fullName': request.form.get('fullName'),
-        'email': request.form.get('email'),
-        'phone': request.form.get('phone'),
-        'location': request.form.get('location'),
-        'linkedin': request.form.get('linkedin'),
-        'github': request.form.get('github'),
-        'summary': request.form.get('summary'),
-        'education': request.form.get('education'),
-        'experience': request.form.get('experience'),
-        'projects': request.form.get('projects'),
-        'courses': request.form.get('courses'),
-        'skills': request.form.get('skills'),
-        'languages': request.form.get('languages')
-    }
-    
-    photo_file = request.files.get('photo')
-    
-    pdf_buffer = build_pdf(data, photo_file)
+    data = extract_form_data(request)
+    photo_b64 = request.form.get('photo_b64')
+    pdf_buffer = build_pdf(data, photo_b64)
     filename = f"CV_{data['fullName'].replace(' ', '_')}.pdf" if data['fullName'] else "Curriculum.pdf"
-    
     return send_file(pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
 
 if __name__ == '__main__':
