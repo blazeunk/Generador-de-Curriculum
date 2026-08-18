@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de CV</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 650px; background: white; padding: 25px; margin: auto; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h2 { color: #1a365d; margin-top: 0; }
+        .group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #4a5568; }
+        input, textarea { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
+        textarea { height: 80px; resize: vertical; }
+        .optional { font-weight: normal; font-size: 0.85em; color: #718096; }
+        button { background: #2b6cb0; color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; }
+        button:hover { background: #2c5282; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Generador de CV</h2>
+    <form action="/generate" method="POST">
+        
+        <div class="group">
+            <label>Nombre Completo *</label>
+            <input type="text" name="fullName" required placeholder="Ej: Gonzalo Pérez">
+        </div>
+
+        <div class="group">
+            <label>Email *</label>
+            <input type="email" name="email" required placeholder="ejemplo@correo.com">
+        </div>
+
+        <div class="group">
+            <label>Teléfono</label>
+            <input type="text" name="phone" placeholder="+54 223 1234567">
+        </div>
+
+        <div class="group">
+            <label>Ubicación</label>
+            <input type="text" name="location" placeholder="Mar del Plata, Argentina">
+        </div>
+
+        <div class="group">
+            <label>LinkedIn / Web <span class="optional">(Opcional)</span></label>
+            <input type="text" name="linkedin" placeholder="linkedin.com/in/usuario">
+        </div>
+
+        <div class="group">
+            <label>Nivel Académico / Educación *</label>
+            <textarea name="education" required placeholder="Analista de Sistemas - Universidad X (2024 - Presente)"></textarea>
+        </div>
+
+        <div class="group">
+            <label>Experiencia Laboral <span class="optional">(Opcional)</span></label>
+            <textarea name="experience" placeholder="Empresa Y - Desarrollador Junior (2025 - Presente)&#10;- Desarrollo de servicios en Python"></textarea>
+        </div>
+
+        <div class="group">
+            <label>Cursos y Certificaciones <span class="optional">(Opcional)</span></label>
+            <textarea name="courses" placeholder="Curso de Python Avanzado - 40hs&#10;Certificación en Desarrollo Web"></textarea>
+        </div>
+
+        <div class="group">
+            <label>Habilidades e Idiomas <span class="optional">(Opcional)</span></label>
+            <textarea name="skills" placeholder="Python, Flask, Git, SQL&#10;Inglés Intermedio"></textarea>
+        </div>
+
+        <button type="submit">Generar y Descargar PDF</button>
+    </form>
+</div>
+
+</body>
+</html>
