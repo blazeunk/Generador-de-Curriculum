@@ -7,74 +7,64 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 app = Flask(__name__)
 
+# Paletas de color predefinidas
+COLOR_THEMES = {
+    'blue': {'primary': '#1A365D', 'secondary': '#2B6CB0', 'text': '#2D3748', 'line': '#CBD5E0'},
+    'dark': {'primary': '#1A202C', 'secondary': '#4A5568', 'text': '#2D3748', 'line': '#E2E8F0'},
+    'green': {'primary': '#1C4532', 'secondary': '#2F855A', 'text': '#2D3748', 'line': '#C6F6D5'},
+    'grey': {'primary': '#2D3748', 'secondary': '#718096', 'text': '#4A5568', 'line': '#E2E8F0'}
+}
+
 def build_pdf(data):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        rightMargin=40,
-        leftMargin=40,
-        topMargin=40,
-        bottomMargin=40
+        buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40
     )
     
+    theme = COLOR_THEMES.get(data.get('theme', 'blue'), COLOR_THEMES['blue'])
     styles = getSampleStyleSheet()
     
-    # Estilos personalizados
     title_style = ParagraphStyle(
-        'CVTitle',
-        parent=styles['Heading1'],
-        fontSize=22,
-        leading=26,
-        textColor=colors.HexColor("#1A365D"),
-        spaceAfter=4
+        'CVTitle', parent=styles['Heading1'], fontSize=22, leading=26,
+        textColor=colors.HexColor(theme['primary']), spaceAfter=4
     )
     
     subtitle_style = ParagraphStyle(
-        'CVSubtitle',
-        parent=styles['Normal'],
-        fontSize=10,
-        leading=14,
-        textColor=colors.HexColor("#4A5568"),
-        spaceAfter=12
+        'CVSubtitle', parent=styles['Normal'], fontSize=9, leading=13,
+        textColor=colors.HexColor('#718096'), spaceAfter=10
     )
     
     section_style = ParagraphStyle(
-        'CVSection',
-        parent=styles['Heading2'],
-        fontSize=14,
-        leading=18,
-        textColor=colors.HexColor("#2B6CB0"),
-        spaceBefore=10,
-        spaceAfter=6
+        'CVSection', parent=styles['Heading2'], fontSize=13, leading=17,
+        textColor=colors.HexColor(theme['secondary']), spaceBefore=10, spaceAfter=4
     )
     
     body_style = ParagraphStyle(
-        'CVBody',
-        parent=styles['Normal'],
-        fontSize=10,
-        leading=14,
-        textColor=colors.HexColor("#2D3748"),
-        spaceAfter=6
+        'CVBody', parent=styles['Normal'], fontSize=9.5, leading=13.5,
+        textColor=colors.HexColor(theme['text']), spaceAfter=6
     )
 
     story = []
 
-    # Encabezado: Nombre y Datos de Contacto
+    # Encabezado
     story.append(Paragraph(data.get('fullName', 'Sin Nombre'), title_style))
     
-    contact_info = []
-    if data.get('email'): contact_info.append(data['email'])
-    if data.get('phone'): contact_info.append(data['phone'])
-    if data.get('location'): contact_info.append(data['location'])
-    if data.get('linkedin'): contact_info.append(data['linkedin'])
+    contact_info = [v for v in [
+        data.get('email'), data.get('phone'), data.get('location'),
+        data.get('linkedin'), data.get('github')
+    ] if v]
     
     if contact_info:
-        story.append(Paragraph(" | ".join(contact_info), subtitle_style))
+        story.append(Paragraph(" • ".join(contact_info), subtitle_style))
     
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E0"), spaceAfter=10))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor(theme['line']), spaceAfter=10))
 
-    # Nivel Académico
+    # Perfil / Resumen Profesional (Opcional)
+    if data.get('summary'):
+        story.append(Paragraph("Perfil Profesional", section_style))
+        story.append(Paragraph(data['summary'].replace('\n', '<br/>'), body_style))
+
+    # Educación
     if data.get('education'):
         story.append(Paragraph("Educación", section_style))
         story.append(Paragraph(data['education'].replace('\n', '<br/>'), body_style))
@@ -84,6 +74,11 @@ def build_pdf(data):
         story.append(Paragraph("Experiencia Laboral", section_style))
         story.append(Paragraph(data['experience'].replace('\n', '<br/>'), body_style))
 
+    # Proyectos Destacados (Opcional)
+    if data.get('projects'):
+        story.append(Paragraph("Proyectos Destacados", section_style))
+        story.append(Paragraph(data['projects'].replace('\n', '<br/>'), body_style))
+
     # Cursos y Certificaciones (Opcional)
     if data.get('courses'):
         story.append(Paragraph("Cursos y Certificaciones", section_style))
@@ -91,7 +86,7 @@ def build_pdf(data):
 
     # Habilidades / Idiomas (Opcional)
     if data.get('skills'):
-        story.append(Paragraph("Habilidades e Idiomas", section_style))
+        story.append(Paragraph("Habilidades y Tecnologías", section_style))
         story.append(Paragraph(data['skills'].replace('\n', '<br/>'), body_style))
 
     doc.build(story)
@@ -105,13 +100,17 @@ def index():
 @app.route('/generate', methods=['POST'])
 def generate():
     data = {
+        'theme': request.form.get('theme', 'blue'),
         'fullName': request.form.get('fullName'),
         'email': request.form.get('email'),
         'phone': request.form.get('phone'),
         'location': request.form.get('location'),
         'linkedin': request.form.get('linkedin'),
+        'github': request.form.get('github'),
+        'summary': request.form.get('summary'),
         'education': request.form.get('education'),
         'experience': request.form.get('experience'),
+        'projects': request.form.get('projects'),
         'courses': request.form.get('courses'),
         'skills': request.form.get('skills')
     }
@@ -119,12 +118,7 @@ def generate():
     pdf_buffer = build_pdf(data)
     filename = f"CV_{data['fullName'].replace(' ', '_')}.pdf" if data['fullName'] else "Curriculum.pdf"
     
-    return send_file(
-        pdf_buffer,
-        as_attachment=True,
-        download_name=filename,
-        mimetype='application/pdf'
-    )
+    return send_file(pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
 
 if __name__ == '__main__':
     app.run(debug=True)
