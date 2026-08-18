@@ -11,6 +11,7 @@
         .group { margin-bottom: 16px; }
         label { display: block; font-weight: 600; margin-bottom: 6px; color: #2d3748; font-size: 14px; }
         input, textarea, select { width: 100%; padding: 9px; box-sizing: border-box; border: 1px solid #cbd5e0; border-radius: 6px; font-family: inherit; font-size: 14px; }
+        input[type="file"] { padding: 5px; background: #fafafa; }
         textarea { height: 75px; resize: vertical; }
         .optional { font-weight: normal; font-size: 0.85em; color: #718096; }
         button { background: #2b6cb0; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; margin-top: 10px; }
@@ -21,7 +22,8 @@
 
 <div class="container">
     <h2>Generador de Curriculum Vitae</h2>
-    <form action="/generate" method="POST">
+    <!-- Importante: enctype para subida de archivos -->
+    <form action="/generate" method="POST" enctype="multipart/form-data">
         
         <div class="group">
             <label>Estilo / Paleta de Colores</label>
@@ -31,6 +33,11 @@
                 <option value="green">Verde Moderno</option>
                 <option value="grey">Minimalista Monocromo</option>
             </select>
+        </div>
+
+        <div class="group">
+            <label>Foto de Perfil <span class="optional">(Opcional, JPG/PNG)</span></label>
+            <input type="file" name="photo" accept="image/*">
         </div>
 
         <div class="group">
@@ -91,6 +98,11 @@
         <div class="group">
             <label>Habilidades y Tecnologías <span class="optional">(Opcional)</span></label>
             <textarea name="skills" placeholder="Lenguajes: Python, SQL, HTML/CSS&#10;Herramientas: Git, Flask, ReportLab"></textarea>
+        </div>
+
+        <div class="group">
+            <label>Idiomas <span class="optional">(Opcional)</span></label>
+            <textarea name="languages" placeholder="Español: Nativo&#10;Inglés: B2 / Intermedio Avanzado"></textarea>
         </div>
 
         <button type="submit">Generar PDF</button>

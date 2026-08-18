@@ -2,12 +2,12 @@ import io
 from flask import Flask, render_template, request, send_file
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Paragraph, HRFlowable, Table, TableStyle, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
 
 app = Flask(__name__)
 
-# Paletas de color predefinidas
 COLOR_THEMES = {
     'blue': {'primary': '#1A365D', 'secondary': '#2B6CB0', 'text': '#2D3748', 'line': '#CBD5E0'},
     'dark': {'primary': '#1A202C', 'secondary': '#4A5568', 'text': '#2D3748', 'line': '#E2E8F0'},
@@ -15,7 +15,7 @@ COLOR_THEMES = {
     'grey': {'primary': '#2D3748', 'secondary': '#718096', 'text': '#4A5568', 'line': '#E2E8F0'}
 }
 
-def build_pdf(data):
+def build_pdf(data, photo_file=None):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40
@@ -25,18 +25,18 @@ def build_pdf(data):
     styles = getSampleStyleSheet()
     
     title_style = ParagraphStyle(
-        'CVTitle', parent=styles['Heading1'], fontSize=22, leading=26,
+        'CVTitle', parent=styles['Heading1'], fontSize=20, leading=24,
         textColor=colors.HexColor(theme['primary']), spaceAfter=4
     )
     
     subtitle_style = ParagraphStyle(
         'CVSubtitle', parent=styles['Normal'], fontSize=9, leading=13,
-        textColor=colors.HexColor('#718096'), spaceAfter=10
+        textColor=colors.HexColor('#718096'), spaceAfter=4
     )
     
     section_style = ParagraphStyle(
-        'CVSection', parent=styles['Heading2'], fontSize=13, leading=17,
-        textColor=colors.HexColor(theme['secondary']), spaceBefore=10, spaceAfter=4
+        'CVSection', parent=styles['Heading2'], fontSize=12, leading=16,
+        textColor=colors.HexColor(theme['secondary']), spaceBefore=8, spaceAfter=4
     )
     
     body_style = ParagraphStyle(
@@ -46,8 +46,10 @@ def build_pdf(data):
 
     story = []
 
-    # Encabezado
-    story.append(Paragraph(data.get('fullName', 'Sin Nombre'), title_style))
+    # --- Bloque Encabezado (Texto + Foto opcional) ---
+    header_text_elements = [
+        Paragraph(data.get('fullName', 'Sin Nombre'), title_style)
+    ]
     
     contact_info = [v for v in [
         data.get('email'), data.get('phone'), data.get('location'),
@@ -55,11 +57,30 @@ def build_pdf(data):
     ] if v]
     
     if contact_info:
-        story.append(Paragraph(" • ".join(contact_info), subtitle_style))
-    
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor(theme['line']), spaceAfter=10))
+        header_text_elements.append(Paragraph(" • ".join(contact_info), subtitle_style))
 
-    # Perfil / Resumen Profesional (Opcional)
+    # Si hay foto, creamos una tabla de 2 columnas para el encabezado
+    if photo_file and photo_file.filename != '':
+        try:
+            photo_bytes = io.BytesIO(photo_file.read())
+            img = Image(photo_bytes, width=1.1*inch, height=1.3*inch)
+            
+            # Tabla: [Texto de Encabezado, Foto]
+            header_table = Table([[header_text_elements, img]], colWidths=[420, 100])
+            header_table.setStyle(TableStyle([
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('ALIGN', (1,0), (1,0), 'RIGHT'),
+            ]))
+            story.append(header_table)
+        except Exception:
+            # Si falla la lectura de la imagen, genera el encabezado sin foto
+            story.extend(header_text_elements)
+    else:
+        story.extend(header_text_elements)
+    
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor(theme['line']), spaceBefore=8, spaceAfter=10))
+
+    # Perfil / Resumen Profesional
     if data.get('summary'):
         story.append(Paragraph("Perfil Profesional", section_style))
         story.append(Paragraph(data['summary'].replace('\n', '<br/>'), body_style))
@@ -69,25 +90,30 @@ def build_pdf(data):
         story.append(Paragraph("Educación", section_style))
         story.append(Paragraph(data['education'].replace('\n', '<br/>'), body_style))
 
-    # Experiencia Laboral (Opcional)
+    # Experiencia Laboral
     if data.get('experience'):
         story.append(Paragraph("Experiencia Laboral", section_style))
         story.append(Paragraph(data['experience'].replace('\n', '<br/>'), body_style))
 
-    # Proyectos Destacados (Opcional)
+    # Proyectos Destacados
     if data.get('projects'):
         story.append(Paragraph("Proyectos Destacados", section_style))
         story.append(Paragraph(data['projects'].replace('\n', '<br/>'), body_style))
 
-    # Cursos y Certificaciones (Opcional)
+    # Cursos y Certificaciones
     if data.get('courses'):
         story.append(Paragraph("Cursos y Certificaciones", section_style))
         story.append(Paragraph(data['courses'].replace('\n', '<br/>'), body_style))
 
-    # Habilidades / Idiomas (Opcional)
+    # Habilidades y Tecnologías
     if data.get('skills'):
         story.append(Paragraph("Habilidades y Tecnologías", section_style))
         story.append(Paragraph(data['skills'].replace('\n', '<br/>'), body_style))
+
+    # Idiomas
+    if data.get('languages'):
+        story.append(Paragraph("Idiomas", section_style))
+        story.append(Paragraph(data['languages'].replace('\n', '<br/>'), body_style))
 
     doc.build(story)
     buffer.seek(0)
@@ -112,10 +138,13 @@ def generate():
         'experience': request.form.get('experience'),
         'projects': request.form.get('projects'),
         'courses': request.form.get('courses'),
-        'skills': request.form.get('skills')
+        'skills': request.form.get('skills'),
+        'languages': request.form.get('languages')
     }
     
-    pdf_buffer = build_pdf(data)
+    photo_file = request.files.get('photo')
+    
+    pdf_buffer = build_pdf(data, photo_file)
     filename = f"CV_{data['fullName'].replace(' ', '_')}.pdf" if data['fullName'] else "Curriculum.pdf"
     
     return send_file(pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
