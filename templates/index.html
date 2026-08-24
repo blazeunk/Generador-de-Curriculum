@@ -123,22 +123,24 @@
 </div>
 
 <script>
-    function convertPhotoToBase64() {
-        const fileInput = document.getElementById('photoInput');
-        const hiddenInput = document.getElementById('photoB64');
-        
-        if (fileInput.files && fileInput.files[0]) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                hiddenInput.value = e.target.result;
-                updatePreview();
-            };
-            reader.readAsDataURL(fileInput.files[0]);
-        } else {
-            hiddenInput.value = '';
+function convertPhotoToBase64() {
+    const fileInput = document.getElementById('photoInput');
+    const hiddenInput = document.getElementById('photoB64');
+    
+    if (fileInput.files && fileInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            // Guardar la cadena Base64 completa del archivo original
+            hiddenInput.value = e.target.result;
             updatePreview();
-        }
+        };
+        // Lee el archivo directamente sin pasar por canvas
+        reader.readAsDataURL(fileInput.files[0]); 
+    } else {
+        hiddenInput.value = '';
+        updatePreview();
     }
+}
 
     function addExperience(company = '', role = '', desc = '') {
         const container = document.getElementById('experienceContainer');
@@ -220,6 +222,11 @@
 
     window.onload = updatePreview;
 </script>
-
+<script>
+    // Envia una petición de apagado cuando el usuario cierra o recarga la pestaña
+    window.addEventListener('beforeunload', function () {
+        navigator.sendBeacon('/shutdown');
+    });
+</script>
 </body>
 </html>

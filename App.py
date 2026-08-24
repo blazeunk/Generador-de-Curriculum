@@ -7,8 +7,16 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, HRFlowable, Table, TableStyle, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
+import sys
+import os
+import signal
+import threading
 
-app = Flask(__name__)
+if getattr(sys, 'frozen', False):
+    template_folder = os.path.join(sys._MEIPASS, 'templates')
+    app = Flask(__name__, template_folder=template_folder)
+else:
+    app = Flask(__name__)
 
 COLOR_THEMES = {
     'blue': {'primary': '#1A365D', 'secondary': '#2B6CB0', 'text': '#2D3748', 'line': '#CBD5E0'},
@@ -71,17 +79,17 @@ def build_pdf(data, photo_base64=None):
             raw_bytes = base64.b64decode(photo_base64)
             pil_img = PILImage.open(io.BytesIO(raw_bytes))
             
-            # Convertir a RGB si la imagen viene en RGBA o P
             if pil_img.mode in ('RGBA', 'P'):
                 pil_img = pil_img.convert('RGB')
                 
             img_io = io.BytesIO()
-            pil_img.save(img_io, format='JPEG')
+            # Guardar en alta calidad
+            pil_img.save(img_io, format='JPEG', quality=95) 
             img_io.seek(0)
             
             img_element = RLImage(img_io, width=1.1*inch, height=1.3*inch)
         except Exception as e:
-            print(f"Error procesando imagen: {e}")
+            print("Error procesando imagen: {}".format(e))
             img_element = None
 
     if img_element:
@@ -156,6 +164,15 @@ def generate():
     pdf_buffer = build_pdf(data, photo_b64)
     filename = f"CV_{data['fullName'].replace(' ', '_')}.pdf" if data['fullName'] else "Curriculum.pdf"
     return send_file(pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
+
+@app.route('/shutdown', methods=['POST'])
+def shutdown():
+    # Apaga el proceso de Flask limpiamente
+    def stop_server():
+        os.kill(os.getpid(), signal.SIGINT)
+        
+    threading.Timer(1, stop_server).start()
+    return 'Servidor cerrado', 200
 
 if __name__ == '__main__':
     app.run(debug=True)
