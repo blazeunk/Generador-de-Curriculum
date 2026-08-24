@@ -1,3 +1,6 @@
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/blazeunk/Generador-de-Curriculum)
+![License MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+
 # 📄 Generador de Currículum Vitae
 
 Un generador práctico y personalizable para crear currículums profesionales de forma rápida, estructurada y limpia.
